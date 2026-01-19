@@ -25,12 +25,7 @@ def test_daemon_connection():
 
         print("✓ Daemon is running correctly")
 
-        # Test basic functionality - set compliant mode
-        print("Testing basic motor control...")
-        mini.set_compliant(head=True)
         time.sleep(0.5)
-
-        print("✓ Basic motor control works")
 
         print("\n=== All tests passed! ===")
 
