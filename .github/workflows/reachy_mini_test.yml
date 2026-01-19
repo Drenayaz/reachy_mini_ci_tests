@@ -1,12 +1,19 @@
 name: Reachy Mini Integration Test
 
 on:
-  workflow_dispatch
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "src/**"
+      - "tests/**"
+      - ".github/workflows/**"
+      - "pyproject.toml"
+  workflow_dispatch:
 
 jobs:
   reachy_mini_test:
-    runs-on: ci_runner_linux
-    timeout-minutes: 15
+    runs-on: ci_runner
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
@@ -24,35 +31,75 @@ jobs:
           python -m pip install --upgrade pip
           pip install reachy-mini
 
-      - name: Start Reachy Mini daemon
+      # ==================== REACHY MINI LITE TEST ====================
+
+      - name: Start Reachy Mini Lite daemon
         run: |
+          echo "🚀 Starting Reachy Mini Lite daemon..."
+          source .venv/bin/activate
+          reachy-mini-daemon --robot-name reachy_mini_lite --serialport auto --localhost-only &
+          echo $! > lite_daemon.pid
+          echo "Daemon PID: $(cat lite_daemon.pid)"
+
+      - name: Wait for Lite daemon to be running
+        run: |
+          echo "⏳ Waiting for Lite daemon to start..."
+          sleep 8
+          if ps -p $(cat lite_daemon.pid) > /dev/null; then
+            echo "✅ Lite daemon process is running"
+          else
+            echo "❌ Lite daemon process died"
+            exit 1
+          fi
+
+      - name: Run Reachy Mini Lite tests
+        run: |
+          source .venv/bin/activate
+          python test_reachy_mini_lite.py
+
+      - name: Stop Reachy Mini Lite daemon
+        if: always()
+        run: |
+          echo "🛑 Stopping Lite daemon..."
+          if [ -f lite_daemon.pid ]; then
+            kill $(cat lite_daemon.pid) || echo "Daemon already stopped"
+            rm lite_daemon.pid
+          fi
+
+      # ==================== REACHY MINI WIRELESS TEST ====================
+
+      - name: Start Reachy Mini Wireless daemon
+        run: |
+          echo "🚀 Starting Reachy Mini Wireless daemon..."
           curl -X POST "http://reachy-mini.local:8000/api/daemon/start?wake_up=true" || echo "Daemon may already be running"
 
-      - name: Wait for daemon to be running
+      - name: Wait for Wireless daemon to be running
         run: |
-          echo "Waiting for daemon to start..."
+          echo "⏳ Waiting for Wireless daemon to start..."
           for i in {1..20}; do
             STATUS=$(curl -s http://reachy-mini.local:8000/api/daemon/status | grep -o '"state":"[^"]*"' | cut -d'"' -f4)
             echo "Attempt $i: Daemon status is '$STATUS'"
             if [ "$STATUS" = "running" ]; then
-              echo "Daemon is now running!"
+              echo "✅ Wireless daemon is now running!"
               exit 0
             fi
             sleep 3
           done
-          echo "Error: Daemon failed to start after 60 seconds"
+          echo "❌ Error: Wireless daemon failed to start after 60 seconds"
           exit 1
 
-      - name: Run Reachy Mini tests
+      - name: Run Reachy Mini Wireless tests
         run: |
           source .venv/bin/activate
-          python test_reachy_mini.py
+          python test_reachy_mini_wireless.py
 
-      - name: Stop Reachy Mini daemon
+      - name: Stop Reachy Mini Wireless daemon
         if: always()
         run: |
-          echo "Stopping daemon..."
+          echo "🛑 Stopping Wireless daemon..."
           curl -X POST "http://reachy-mini.local:8000/api/daemon/stop?goto_sleep=true" || echo "Failed to stop daemon"
+
+      # ==================== CLEANUP ====================
 
       - name: Cleanup virtual environment
         if: always()
