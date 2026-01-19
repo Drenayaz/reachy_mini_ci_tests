@@ -71,13 +71,13 @@ jobs:
       - name: Start Reachy Mini Wireless daemon
         run: |
           echo "🚀 Starting Reachy Mini Wireless daemon..."
-          curl -X POST "http://192.168.10.141:8000/api/daemon/start?wake_up=true" || echo "Daemon may already be running"
+          curl -X POST "http://reachy-mini-ci.local:8000/api/daemon/start?wake_up=true" || echo "Daemon may already be running"
 
       - name: Wait for Wireless daemon to be running
         run: |
           echo "⏳ Waiting for Wireless daemon to start..."
           for i in {1..20}; do
-            STATUS=$(curl -s http://192.168.10.141:8000/api/daemon/status | grep -o '"state":"[^"]*"' | cut -d'"' -f4)
+            STATUS=$(curl -s http://reachy-mini-ci.local:8000/api/daemon/status | grep -o '"state":"[^"]*"' | cut -d'"' -f4)
             echo "Attempt $i: Daemon status is '$STATUS'"
             if [ "$STATUS" = "running" ]; then
               echo "✅ Wireless daemon is now running!"
@@ -97,7 +97,7 @@ jobs:
         if: always()
         run: |
           echo "🛑 Stopping Wireless daemon..."
-          curl -X POST "http://192.168.10.141:8000/api/daemon/stop?goto_sleep=true" || echo "Failed to stop daemon"
+          curl -X POST "http://reachy-mini-ci.local:8000/api/daemon/stop?goto_sleep=true" || echo "Failed to stop daemon"
 
       # ==================== CLEANUP ====================
 
