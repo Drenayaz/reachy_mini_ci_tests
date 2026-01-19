@@ -1,0 +1,66 @@
+name: Reachy Mini Integration Test
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "src/**"
+      - "tests/**"
+      - ".github/workflows/**"
+      - "pyproject.toml"
+  workflow_dispatch:
+
+jobs:
+  reachy_mini_test:
+    runs-on: ci_runner
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Create virtual environment
+        run: python -m venv .venv
+
+      - name: Install dependencies
+        run: |
+          source .venv/bin/activate
+          python -m pip install --upgrade pip
+          pip install reachy-mini
+
+      - name: Start Reachy Mini daemon
+        run: |
+          curl -X POST "http://reachy-mini.local:8000/api/daemon/start?wake_up=true" || echo "Daemon may already be running"
+
+      - name: Wait for daemon to be running
+        run: |
+          echo "Waiting for daemon to start..."
+          for i in {1..20}; do
+            STATUS=$(curl -s http://reachy-mini.local:8000/api/daemon/status | grep -o '"state":"[^"]*"' | cut -d'"' -f4)
+            echo "Attempt $i: Daemon status is '$STATUS'"
+            if [ "$STATUS" = "running" ]; then
+              echo "Daemon is now running!"
+              exit 0
+            fi
+            sleep 3
+          done
+          echo "Error: Daemon failed to start after 60 seconds"
+          exit 1
+
+      - name: Run Reachy Mini tests
+        run: |
+          source .venv/bin/activate
+          python test_reachy_mini.py
+
+      - name: Stop Reachy Mini daemon
+        if: always()
+        run: |
+          echo "Stopping daemon..."
+          curl -X POST "http://reachy-mini.local:8000/api/daemon/stop?goto_sleep=true" || echo "Failed to stop daemon"
+
+      - name: Cleanup virtual environment
+        if: always()
+        run: rm -rf .venv
