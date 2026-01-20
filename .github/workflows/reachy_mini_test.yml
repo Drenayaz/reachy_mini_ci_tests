@@ -110,12 +110,24 @@ jobs:
     runs-on: ci-runner-windows
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - name: Clean workspace
+        shell: pwsh
+        run: |
+          Write-Host "Cleaning workspace..."
+          if (Test-Path $env:GITHUB_WORKSPACE) {
+            Remove-Item -Path "$env:GITHUB_WORKSPACE\*" -Recurse -Force -ErrorAction SilentlyContinue
+          }
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/checkout@v4
         with:
-          python-version: '3.10'
+          clean: true
+
+      - name: Verify Python
+        shell: pwsh
+        run: |
+          Write-Host "Using system Python..."
+          python --version
+          Write-Host "Python path: $((Get-Command python).Source)"
 
       - name: Create virtual environment
         shell: pwsh
