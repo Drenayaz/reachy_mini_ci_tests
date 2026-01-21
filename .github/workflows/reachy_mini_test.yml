@@ -12,7 +12,7 @@ on:
 
 jobs:
   reachy_mini_test_linux:
-    runs-on: ci_runner_linux
+    runs-on: ci-runner-linux
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
