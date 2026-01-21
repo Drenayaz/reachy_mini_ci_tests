@@ -142,16 +142,32 @@ jobs:
         run: |
           Write-Host "Starting Reachy Mini Lite daemon..."
           .venv\Scripts\Activate.ps1
-          Start-Job -ScriptBlock {
+          $job = Start-Job -ScriptBlock {
             Set-Location $using:PWD
             & ".venv\Scripts\reachy-mini-daemon.exe" --robot-name reachy_mini_lite --serialport auto --localhost-only
-          } | Out-Null
+          }
+          Start-Sleep -Seconds 3
+          $jobState = $job.State
+          Write-Host "Job state after 3 seconds: $jobState"
+          if ($jobState -eq "Failed" -or $jobState -eq "Stopped") {
+            Write-Host "[ERROR] Job failed to start. Output:"
+            Receive-Job -Job $job
+            exit 1
+          }
 
       - name: Wait for Lite daemon to be running
         shell: powershell
         run: |
           Write-Host "Waiting for Lite daemon to start..."
           for ($i = 1; $i -le 20; $i++) {
+            # Check if job is still running
+            $job = Get-Job | Where-Object { $_.State -eq "Running" } | Select-Object -First 1
+            if (-not $job) {
+              Write-Host "[ERROR] Daemon job is not running anymore. Job output:"
+              Get-Job | Receive-Job
+              exit 1
+            }
+
             try {
               $response = Invoke-RestMethod -Uri "http://localhost:8000/api/daemon/status" -Method Get
               $status = $response.state
@@ -166,6 +182,8 @@ jobs:
             Start-Sleep -Seconds 3
           }
           Write-Host "[ERROR] Lite daemon failed to start after 60 seconds"
+          Write-Host "Job output:"
+          Get-Job | Receive-Job
           exit 1
 
       - name: Run Reachy Mini Lite tests
