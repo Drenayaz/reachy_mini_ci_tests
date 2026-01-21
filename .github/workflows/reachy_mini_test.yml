@@ -109,8 +109,10 @@ jobs:
         if: always()
         run: |
           echo "Stopping Lite daemon..."
+          curl -X POST "http://localhost:8000/api/daemon/stop?goto_sleep=true" || echo "Failed to stop daemon via API"
+          sleep 2
           if [ -f lite_daemon.pid ]; then
-            kill $(cat lite_daemon.pid) || echo "Daemon already stopped"
+            kill $(cat lite_daemon.pid) 2>/dev/null || echo "Daemon already stopped"
             rm lite_daemon.pid
           fi
 
@@ -140,9 +142,10 @@ jobs:
         run: |
           Write-Host "Starting Reachy Mini Lite daemon..."
           .venv\Scripts\Activate.ps1
-          $process = Start-Process -FilePath ".venv\Scripts\reachy-mini-daemon.exe" -ArgumentList "--robot-name", "reachy_mini_lite", "--serialport", "auto", "--localhost-only" -PassThru -NoNewWindow -RedirectStandardOutput "lite_stdout.log" -RedirectStandardError "lite_stderr.log"
-          $process.Id | Out-File -FilePath lite_daemon.pid
-          Write-Host "Daemon PID: $($process.Id)"
+          Start-Job -ScriptBlock {
+            Set-Location $using:PWD
+            & ".venv\Scripts\reachy-mini-daemon.exe" --robot-name reachy_mini_lite --serialport auto --localhost-only
+          } | Out-Null
 
       - name: Wait for Lite daemon to be running
         shell: powershell
@@ -176,16 +179,13 @@ jobs:
         shell: powershell
         run: |
           Write-Host "Stopping Lite daemon..."
-          if (Test-Path lite_daemon.pid) {
-            $pid = Get-Content lite_daemon.pid
-            try {
-              Stop-Process -Id $pid -Force -ErrorAction SilentlyContinue
-              Write-Host "Daemon stopped"
-            } catch {
-              Write-Host "Daemon already stopped"
-            }
-            Remove-Item lite_daemon.pid
+          curl.exe -X POST "http://localhost:8000/api/daemon/stop?goto_sleep=true"
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "Failed to stop daemon via API"
           }
+          Start-Sleep -Seconds 2
+          Get-Job | Stop-Job -ErrorAction SilentlyContinue
+          Get-Job | Remove-Job -ErrorAction SilentlyContinue
 
       - name: Cleanup virtual environment
         if: always()
