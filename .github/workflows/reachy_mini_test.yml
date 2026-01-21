@@ -18,12 +18,12 @@ jobs:
       - uses: actions/checkout@v4
   
       - name: Create virtual environment
-        run: python -m venv .venv
+        run: python3 -m venv .venv
   
       - name: Install dependencies
         run: |
           source .venv/bin/activate
-          python -m pip install --upgrade pip
+          python3 -m pip install --upgrade pip
           pip install reachy-mini
   
       # ==================== REACHY MINI LITE TEST ====================
@@ -50,7 +50,7 @@ jobs:
       - name: Run Reachy Mini Lite tests
         run: |
           source .venv/bin/activate
-          python test_reachy_mini_lite.py
+          python3 test_reachy_mini_lite.py
   
       - name: Stop Reachy Mini Lite daemon
         if: always()
@@ -86,7 +86,7 @@ jobs:
       - name: Run Reachy Mini Wireless tests
         run: |
           source .venv/bin/activate
-          python test_reachy_mini_wireless.py
+          python3 test_reachy_mini_wireless.py
   
       - name: Stop Reachy Mini Wireless daemon
         if: always()
