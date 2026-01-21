@@ -118,82 +118,82 @@ jobs:
         if: always()
         run: rm -rf .venv
 
-  # windows_lite:
-  #   runs-on: ci-runner-windows
-  #   timeout-minutes: 10
-  #   steps:
-  #     - uses: actions/checkout@v4
+  windows_lite:
+    runs-on: ci-runner-windows
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
 
-  #     - name: Create virtual environment
-  #       shell: powershell
-  #       run: python -m venv .venv
+      - name: Create virtual environment
+        shell: powershell
+        run: python -m venv .venv
 
-  #     - name: Install dependencies
-  #       shell: powershell
-  #       run: |
-  #         .venv\Scripts\Activate.ps1
-  #         python -m pip install --upgrade pip
-  #         pip install reachy-mini
+      - name: Install dependencies
+        shell: powershell
+        run: |
+          .venv\Scripts\Activate.ps1
+          python -m pip install --upgrade pip
+          pip install reachy-mini
 
-  #     - name: Start Reachy Mini Lite daemon
-  #       shell: powershell
-  #       run: |
-  #         Write-Host "Starting Reachy Mini Lite daemon..."
-  #         .venv\Scripts\Activate.ps1
-  #         $process = Start-Process -FilePath ".venv\Scripts\reachy-mini-daemon.exe" -ArgumentList "--robot-name", "reachy_mini_lite", "--serialport", "auto", "--localhost-only" -PassThru -NoNewWindow -RedirectStandardOutput "lite_stdout.log" -RedirectStandardError "lite_stderr.log"
-  #         $process.Id | Out-File -FilePath lite_daemon.pid
-  #         Write-Host "Daemon PID: $($process.Id)"
+      - name: Start Reachy Mini Lite daemon
+        shell: powershell
+        run: |
+          Write-Host "Starting Reachy Mini Lite daemon..."
+          .venv\Scripts\Activate.ps1
+          $process = Start-Process -FilePath ".venv\Scripts\reachy-mini-daemon.exe" -ArgumentList "--robot-name", "reachy_mini_lite", "--serialport", "auto", "--localhost-only" -PassThru -NoNewWindow -RedirectStandardOutput "lite_stdout.log" -RedirectStandardError "lite_stderr.log"
+          $process.Id | Out-File -FilePath lite_daemon.pid
+          Write-Host "Daemon PID: $($process.Id)"
 
-  #     - name: Wait for Lite daemon to be running
-  #       shell: powershell
-  #       run: |
-  #         Write-Host "Waiting for Lite daemon to start..."
-  #         for ($i = 1; $i -le 20; $i++) {
-  #           try {
-  #             $response = Invoke-RestMethod -Uri "http://localhost:8000/api/daemon/status" -Method Get
-  #             $status = $response.state
-  #             Write-Host "Attempt $i : Daemon status is '$status'"
-  #             if ($status -eq "running") {
-  #               Write-Host "[OK] Lite daemon is now running!"
-  #               exit 0
-  #             }
-  #           } catch {
-  #             Write-Host "Attempt $i : Failed to get status"
-  #           }
-  #           Start-Sleep -Seconds 3
-  #         }
-  #         Write-Host "[ERROR] Lite daemon failed to start after 60 seconds"
-  #         exit 1
+      - name: Wait for Lite daemon to be running
+        shell: powershell
+        run: |
+          Write-Host "Waiting for Lite daemon to start..."
+          for ($i = 1; $i -le 20; $i++) {
+            try {
+              $response = Invoke-RestMethod -Uri "http://localhost:8000/api/daemon/status" -Method Get
+              $status = $response.state
+              Write-Host "Attempt $i : Daemon status is '$status'"
+              if ($status -eq "running") {
+                Write-Host "[OK] Lite daemon is now running!"
+                exit 0
+              }
+            } catch {
+              Write-Host "Attempt $i : Failed to get status"
+            }
+            Start-Sleep -Seconds 3
+          }
+          Write-Host "[ERROR] Lite daemon failed to start after 60 seconds"
+          exit 1
 
-  #     - name: Run Reachy Mini Lite tests
-  #       shell: powershell
-  #       run: |
-  #         .venv\Scripts\Activate.ps1
-  #         python test_reachy_mini_lite.py
+      - name: Run Reachy Mini Lite tests
+        shell: powershell
+        run: |
+          .venv\Scripts\Activate.ps1
+          python test_reachy_mini_lite.py
 
-  #     - name: Stop Reachy Mini Lite daemon
-  #       if: always()
-  #       shell: powershell
-  #       run: |
-  #         Write-Host "Stopping Lite daemon..."
-  #         if (Test-Path lite_daemon.pid) {
-  #           $pid = Get-Content lite_daemon.pid
-  #           try {
-  #             Stop-Process -Id $pid -Force -ErrorAction SilentlyContinue
-  #             Write-Host "Daemon stopped"
-  #           } catch {
-  #             Write-Host "Daemon already stopped"
-  #           }
-  #           Remove-Item lite_daemon.pid
-  #         }
+      - name: Stop Reachy Mini Lite daemon
+        if: always()
+        shell: powershell
+        run: |
+          Write-Host "Stopping Lite daemon..."
+          if (Test-Path lite_daemon.pid) {
+            $pid = Get-Content lite_daemon.pid
+            try {
+              Stop-Process -Id $pid -Force -ErrorAction SilentlyContinue
+              Write-Host "Daemon stopped"
+            } catch {
+              Write-Host "Daemon already stopped"
+            }
+            Remove-Item lite_daemon.pid
+          }
 
-  #     - name: Cleanup virtual environment
-  #       if: always()
-  #       shell: powershell
-  #       run: Remove-Item -Recurse -Force .venv -ErrorAction SilentlyContinue
+      - name: Cleanup virtual environment
+        if: always()
+        shell: powershell
+        run: Remove-Item -Recurse -Force .venv -ErrorAction SilentlyContinue
 
   windows_wireless:
-    needs: linux_wireless
+    needs: [linux_wireless, windows_lite]
     runs-on: ci-runner-windows
     timeout-minutes: 10
     steps:
