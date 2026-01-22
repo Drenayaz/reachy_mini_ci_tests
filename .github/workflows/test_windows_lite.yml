@@ -69,6 +69,12 @@ jobs:
           Write-Host "[ERROR] Lite daemon failed to start after 60 seconds"
           exit 1
 
+      - name: Run Reachy Mini Lite tests
+        shell: powershell
+        run: |
+          .venv\Scripts\Activate.ps1
+          python test_reachy_mini_lite.py
+
       - name: Stop Reachy Mini Lite daemon
         if: always()
         shell: powershell

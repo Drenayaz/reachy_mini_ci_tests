@@ -126,6 +126,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Cleanup any existing daemon process
+        shell: powershell
+        run: |
+          Write-Host "Checking for existing daemon processes..."
+          Get-Process | Where-Object {$_.ProcessName -like "*reachy*"} | ForEach-Object {
+            Write-Host "Killing existing process: $($_.ProcessName) (PID: $($_.Id))"
+            Stop-Process -Id $_.Id -Force -ErrorAction SilentlyContinue
+          }
+          Write-Host "Cleanup complete"
+
       - name: Create virtual environment
         shell: powershell
         run: python -m venv .venv
@@ -140,11 +150,19 @@ jobs:
       - name: Start Reachy Mini Lite daemon
         shell: powershell
         run: |
-          Write-Host "Starting Reachy Mini Lite daemon..."
+          Write-Host "Starting Reachy Mini Lite daemon with detached process..."
           .venv\Scripts\Activate.ps1
-          $process = Start-Process -FilePath "reachy-mini-daemon" -ArgumentList "--robot-name", "reachy_mini_lite", "--serialport", "auto", "--localhost-only" -PassThru -NoNewWindow
-          $process.Id | Out-File -FilePath lite_daemon.pid
-          Write-Host "Daemon PID: $($process.Id)"
+          cmd /c "start /B .venv\Scripts\reachy-mini-daemon.exe --robot-name reachy_mini_lite --serialport auto --localhost-only"
+          Start-Sleep -Seconds 5
+          Write-Host "Finding daemon PID..."
+          $process = Get-Process | Where-Object {$_.ProcessName -eq "reachy-mini-daemon"} | Select-Object -First 1
+          if ($process) {
+            $process.Id | Out-File -FilePath lite_daemon.pid
+            Write-Host "Daemon PID: $($process.Id)"
+          } else {
+            Write-Host "[ERROR] Could not find daemon process"
+            exit 1
+          }
 
       - name: Wait for Lite daemon to be running
         shell: powershell
@@ -152,7 +170,7 @@ jobs:
           Write-Host "Waiting for Lite daemon to start..."
           for ($i = 1; $i -le 20; $i++) {
             try {
-              $response = Invoke-RestMethod -Uri "http://localhost:8000/api/daemon/status" -Method Get
+              $response = Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/daemon/status" -Method Get
               $status = $response.state
               Write-Host "Attempt $i : Daemon status is '$status'"
               if ($status -eq "running") {
@@ -177,16 +195,22 @@ jobs:
         if: always()
         shell: powershell
         run: |
-          Write-Host "Stopping Lite daemon..."
-          curl.exe -X POST "http://localhost:8000/api/daemon/stop?goto_sleep=true"
-          if ($LASTEXITCODE -ne 0) {
-            Write-Host "Failed to stop daemon via API"
+          Write-Host "Stopping Lite daemon via API..."
+          curl.exe -X POST "http://127.0.0.1:8000/api/daemon/stop?goto_sleep=true"
+          if ($LASTEXITCODE -eq 0) {
+            Write-Host "API stop successful"
+          } else {
+            Write-Host "API stop failed, will force kill"
           }
-          Start-Sleep -Seconds 2
+          Start-Sleep -Seconds 3
           if (Test-Path lite_daemon.pid) {
-            $pid = Get-Content lite_daemon.pid
-            Stop-Process -Id $pid -Force -ErrorAction SilentlyContinue
+            $daemonPid = Get-Content lite_daemon.pid
+            Write-Host "Killing process PID: $daemonPid"
+            Stop-Process -Id $daemonPid -Force -ErrorAction SilentlyContinue
             Remove-Item lite_daemon.pid
+            Write-Host "Process stopped and PID file removed"
+          } else {
+            Write-Host "No PID file found"
           }
 
       - name: Cleanup virtual environment
