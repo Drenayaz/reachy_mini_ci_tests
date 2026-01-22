@@ -1,0 +1,29 @@
+name: Test Windows Lite Daemon
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test_windows_lite:
+    runs-on: ci-runner-windows
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create virtual environment
+        shell: powershell
+        run: python -m venv .venv
+
+      - name: Install dependencies
+        shell: powershell
+        run: |
+          .venv\Scripts\Activate.ps1
+          python -m pip install --upgrade pip
+          pip install reachy-mini
+
+      - name: Start daemon (foreground to see all output)
+        shell: powershell
+        run: |
+          Write-Host "Starting Reachy Mini Lite daemon in foreground..."
+          .venv\Scripts\Activate.ps1
+          reachy-mini-daemon --robot-name reachy_mini_lite --serialport auto --localhost-only
