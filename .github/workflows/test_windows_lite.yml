@@ -39,19 +39,27 @@ jobs:
           $process = Start-Process reachy-mini-daemon -ArgumentList "--robot-name", "reachy_mini_lite", "--serialport", "auto", "--localhost-only" -NoNewWindow -PassThru
           $process.Id | Out-File -FilePath lite_daemon.pid
           Write-Host "Daemon PID: $($process.Id)"
-          Write-Host "Waiting 20 seconds for daemon to initialize..."
-          Start-Sleep -Seconds 20
+          Write-Host "Waiting 30 seconds for daemon to initialize..."
+          Start-Sleep -Seconds 30
 
       - name: Check daemon status
         shell: powershell
         run: |
           Write-Host "Checking daemon status..."
-          $response = Invoke-RestMethod -Uri "http://localhost:8000/api/daemon/status" -Method Get
-          Write-Host "Daemon state: $($response.state)"
-          if ($response.state -eq "running") {
-            Write-Host "[OK] Lite daemon is running!"
-          } else {
-            Write-Host "[ERROR] Daemon state is not 'running'"
+          Write-Host "Testing connection to 127.0.0.1:8000..."
+          try {
+            $response = Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/daemon/status" -Method Get
+            Write-Host "Daemon state: $($response.state)"
+            if ($response.state -eq "running") {
+              Write-Host "[OK] Lite daemon is running!"
+            } else {
+              Write-Host "[ERROR] Daemon state is not 'running'"
+              exit 1
+            }
+          } catch {
+            Write-Host "[ERROR] Failed to connect: $($_.Exception.Message)"
+            Write-Host "Checking if port 8000 is listening..."
+            netstat -ano | findstr ":8000"
             exit 1
           }
 
@@ -60,7 +68,7 @@ jobs:
         shell: powershell
         run: |
           Write-Host "Stopping Lite daemon via API..."
-          curl.exe -X POST "http://localhost:8000/api/daemon/stop?goto_sleep=true"
+          curl.exe -X POST "http://127.0.0.1:8000/api/daemon/stop?goto_sleep=true"
           if ($LASTEXITCODE -eq 0) {
             Write-Host "API stop successful"
           } else {
@@ -68,9 +76,9 @@ jobs:
           }
           Start-Sleep -Seconds 3
           if (Test-Path lite_daemon.pid) {
-            $pid = Get-Content lite_daemon.pid
-            Write-Host "Killing process PID: $pid"
-            Stop-Process -Id $pid -Force -ErrorAction SilentlyContinue
+            $daemonPid = Get-Content lite_daemon.pid
+            Write-Host "Killing process PID: $daemonPid"
+            Stop-Process -Id $daemonPid -Force -ErrorAction SilentlyContinue
             Remove-Item lite_daemon.pid
             Write-Host "Process stopped and PID file removed"
           } else {
