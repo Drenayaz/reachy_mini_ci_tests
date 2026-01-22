@@ -345,3 +345,105 @@ jobs:
         if: always()
         shell: powershell
         run: Remove-Item -Recurse -Force .venv -ErrorAction SilentlyContinue
+
+  windows_sim:
+    needs: windows_lite
+    runs-on: ci-runner-windows
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cleanup any existing daemon process
+        shell: powershell
+        run: |
+          Write-Host "Checking for existing daemon processes..."
+          Get-Process | Where-Object {$_.ProcessName -like "*reachy*"} | ForEach-Object {
+            Write-Host "Killing existing process: $($_.ProcessName) (PID: $($_.Id))"
+            Stop-Process -Id $_.Id -Force -ErrorAction SilentlyContinue
+          }
+          Write-Host "Cleanup complete"
+
+      - name: Create virtual environment
+        shell: powershell
+        run: python -m venv .venv
+
+      - name: Install dependencies with MuJoCo
+        shell: powershell
+        run: |
+          .venv\Scripts\Activate.ps1
+          python -m pip install --upgrade pip
+          pip install reachy-mini[mujoco]
+
+      - name: Start Reachy Mini Simulation daemon
+        shell: powershell
+        run: |
+          Write-Host "Starting Reachy Mini Simulation daemon with detached process..."
+          .venv\Scripts\Activate.ps1
+          cmd /c "start /B .venv\Scripts\reachy-mini-daemon.exe --robot-name reachy_mini_sim --sim --headless --localhost-only"
+          Start-Sleep -Seconds 5
+          Write-Host "Finding daemon PID..."
+          $process = Get-Process | Where-Object {$_.ProcessName -eq "reachy-mini-daemon"} | Select-Object -First 1
+          if ($process) {
+            $process.Id | Out-File -FilePath sim_daemon.pid
+            Write-Host "Daemon PID: $($process.Id)"
+          } else {
+            Write-Host "[ERROR] Could not find daemon process"
+            exit 1
+          }
+
+      - name: Wait for Simulation daemon to be running
+        shell: powershell
+        run: |
+          Write-Host "Waiting for Simulation daemon to start..."
+          for ($i = 1; $i -le 20; $i++) {
+            try {
+              $response = Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/daemon/status" -Method Get
+              $status = $response.state
+              Write-Host "Attempt $i : Daemon status is '$status'"
+              if ($status -eq "running") {
+                Write-Host "[OK] Simulation daemon is now running!"
+                exit 0
+              }
+            } catch {
+              Write-Host "Attempt $i : Failed to get status"
+            }
+            Start-Sleep -Seconds 3
+          }
+          Write-Host "[ERROR] Simulation daemon failed to start after 60 seconds"
+          exit 1
+
+      - name: Run Reachy Mini Simulation tests
+        shell: powershell
+        run: |
+          .venv\Scripts\Activate.ps1
+          python test_reachy_mini_sim.py
+
+      - name: Stop Reachy Mini Simulation daemon
+        if: always()
+        shell: powershell
+        run: |
+          Write-Host "Stopping Simulation daemon via API..."
+          curl.exe -X POST "http://127.0.0.1:8000/api/daemon/stop?goto_sleep=true"
+          if ($LASTEXITCODE -eq 0) {
+            Write-Host "API stop successful"
+          } else {
+            Write-Host "API stop failed, will force kill"
+          }
+          Start-Sleep -Seconds 3
+          if (Test-Path sim_daemon.pid) {
+            $daemonPid = Get-Content sim_daemon.pid
+            Write-Host "Killing process PID: $daemonPid"
+            Stop-Process -Id $daemonPid -Force -ErrorAction SilentlyContinue
+            Remove-Item sim_daemon.pid
+            Write-Host "Process stopped and PID file removed"
+          } else {
+            Write-Host "No PID file found"
+          }
+
+      - name: Cleanup virtual environment
+        if: always()
+        shell: powershell
+        run: |
+          Write-Host "Cleaning up virtual environment..."
+          Remove-Item -Recurse -Force .venv -ErrorAction SilentlyContinue
+          Write-Host "Cleanup complete"
