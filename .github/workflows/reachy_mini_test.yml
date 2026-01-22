@@ -120,6 +120,65 @@ jobs:
         if: always()
         run: rm -rf .venv
 
+  linux_sim:
+    needs: linux_lite
+    runs-on: ci-runner-linux
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create virtual environment
+        run: python3 -m venv .venv
+
+      - name: Install dependencies with MuJoCo
+        run: |
+          source .venv/bin/activate
+          python3 -m pip install --upgrade pip
+          pip install reachy-mini[mujoco]
+
+      - name: Start Reachy Mini Simulation daemon
+        run: |
+          echo "Starting Reachy Mini Simulation daemon..."
+          source .venv/bin/activate
+          reachy-mini-daemon --robot-name reachy_mini_sim --sim --headless --localhost-only &
+          echo $! > sim_daemon.pid
+          echo "Daemon PID: $(cat sim_daemon.pid)"
+
+      - name: Wait for Simulation daemon to be running
+        run: |
+          echo "Waiting for Simulation daemon to start..."
+          for i in {1..20}; do
+            STATUS=$(curl -s http://localhost:8000/api/daemon/status | grep -o '"state":"[^"]*"' | cut -d'"' -f4)
+            echo "Attempt $i: Daemon status is '$STATUS'"
+            if [ "$STATUS" = "running" ]; then
+              echo "[OK] Simulation daemon is now running!"
+              exit 0
+            fi
+            sleep 3
+          done
+          echo "[ERROR] Simulation daemon failed to start after 60 seconds"
+          exit 1
+
+      - name: Run Reachy Mini Simulation tests
+        run: |
+          source .venv/bin/activate
+          python3 test_reachy_mini_sim.py
+
+      - name: Stop Reachy Mini Simulation daemon
+        if: always()
+        run: |
+          echo "Stopping Simulation daemon..."
+          curl -X POST "http://localhost:8000/api/daemon/stop?goto_sleep=true" || echo "Failed to stop daemon via API"
+          sleep 2
+          if [ -f sim_daemon.pid ]; then
+            kill $(cat sim_daemon.pid) 2>/dev/null || echo "Daemon already stopped"
+            rm sim_daemon.pid
+          fi
+
+      - name: Cleanup virtual environment
+        if: always()
+        run: rm -rf .venv
+
   windows_lite:
     runs-on: ci-runner-windows
     timeout-minutes: 10
