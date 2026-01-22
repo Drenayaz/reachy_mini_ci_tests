@@ -34,18 +34,43 @@ jobs:
       - name: Start Reachy Mini Lite daemon
         shell: powershell
         run: |
-          Write-Host "Starting Reachy Mini Lite daemon..."
+          Write-Host "Starting Reachy Mini Lite daemon with detached process..."
           .venv\Scripts\Activate.ps1
-          $process = Start-Process reachy-mini-daemon -ArgumentList "--robot-name", "reachy_mini_lite", "--serialport", "auto", "--localhost-only" -NoNewWindow -PassThru
-          $process.Id | Out-File -FilePath lite_daemon.pid
-          Write-Host "Daemon PID: $($process.Id)"
-          Write-Host "Waiting 30 seconds for daemon to initialize..."
-          Start-Sleep -Seconds 30
+          cmd /c "start /B .venv\Scripts\reachy-mini-daemon.exe --robot-name reachy_mini_lite --serialport auto --localhost-only"
+          Start-Sleep -Seconds 5
+          Write-Host "Finding daemon PID..."
+          $process = Get-Process | Where-Object {$_.ProcessName -eq "reachy-mini-daemon"} | Select-Object -First 1
+          if ($process) {
+            $process.Id | Out-File -FilePath lite_daemon.pid
+            Write-Host "Daemon PID: $($process.Id)"
+          } else {
+            Write-Host "[ERROR] Could not find daemon process"
+            exit 1
+          }
+          Write-Host "Waiting 25 more seconds for daemon to initialize..."
+          Start-Sleep -Seconds 25
 
       - name: Check daemon status
         shell: powershell
         run: |
-          Write-Host "Checking daemon status..."
+          Write-Host "Checking if daemon process is still alive..."
+          if (Test-Path lite_daemon.pid) {
+            $daemonPid = Get-Content lite_daemon.pid
+            $process = Get-Process -Id $daemonPid -ErrorAction SilentlyContinue
+            if ($process) {
+              Write-Host "Daemon process is alive (PID: $daemonPid)"
+            } else {
+              Write-Host "[ERROR] Daemon process died (PID: $daemonPid)"
+              exit 1
+            }
+          } else {
+            Write-Host "[ERROR] PID file not found"
+            exit 1
+          }
+
+          Write-Host "Checking if port 8000 is listening..."
+          netstat -ano | findstr ":8000"
+
           Write-Host "Testing connection to 127.0.0.1:8000..."
           try {
             $response = Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/daemon/status" -Method Get
@@ -58,8 +83,6 @@ jobs:
             }
           } catch {
             Write-Host "[ERROR] Failed to connect: $($_.Exception.Message)"
-            Write-Host "Checking if port 8000 is listening..."
-            netstat -ano | findstr ":8000"
             exit 1
           }
 
