@@ -10,6 +10,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Cleanup any existing daemon process
+        shell: powershell
+        run: |
+          Write-Host "Checking for existing daemon processes..."
+          Get-Process | Where-Object {$_.ProcessName -like "*reachy*"} | ForEach-Object {
+            Write-Host "Killing existing process: $($_.ProcessName) (PID: $($_.Id))"
+            Stop-Process -Id $_.Id -Force -ErrorAction SilentlyContinue
+          }
+          Write-Host "Cleanup complete"
+
       - name: Create virtual environment
         shell: powershell
         run: python -m venv .venv
