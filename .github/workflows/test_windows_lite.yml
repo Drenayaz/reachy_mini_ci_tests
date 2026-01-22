@@ -47,44 +47,27 @@ jobs:
             Write-Host "[ERROR] Could not find daemon process"
             exit 1
           }
-          Write-Host "Waiting 25 more seconds for daemon to initialize..."
-          Start-Sleep -Seconds 25
 
-      - name: Check daemon status
+      - name: Wait for daemon to be running
         shell: powershell
         run: |
-          Write-Host "Checking if daemon process is still alive..."
-          if (Test-Path lite_daemon.pid) {
-            $daemonPid = Get-Content lite_daemon.pid
-            $process = Get-Process -Id $daemonPid -ErrorAction SilentlyContinue
-            if ($process) {
-              Write-Host "Daemon process is alive (PID: $daemonPid)"
-            } else {
-              Write-Host "[ERROR] Daemon process died (PID: $daemonPid)"
-              exit 1
+          Write-Host "Waiting for Lite daemon to start..."
+          for ($i = 1; $i -le 20; $i++) {
+            try {
+              $response = Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/daemon/status" -Method Get
+              $status = $response.state
+              Write-Host "Attempt $i : Daemon status is '$status'"
+              if ($status -eq "running") {
+                Write-Host "[OK] Lite daemon is now running!"
+                exit 0
+              }
+            } catch {
+              Write-Host "Attempt $i : Failed to get status"
             }
-          } else {
-            Write-Host "[ERROR] PID file not found"
-            exit 1
+            Start-Sleep -Seconds 3
           }
-
-          Write-Host "Checking if port 8000 is listening..."
-          netstat -ano | findstr ":8000"
-
-          Write-Host "Testing connection to 127.0.0.1:8000..."
-          try {
-            $response = Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/daemon/status" -Method Get
-            Write-Host "Daemon state: $($response.state)"
-            if ($response.state -eq "running") {
-              Write-Host "[OK] Lite daemon is running!"
-            } else {
-              Write-Host "[ERROR] Daemon state is not 'running'"
-              exit 1
-            }
-          } catch {
-            Write-Host "[ERROR] Failed to connect: $($_.Exception.Message)"
-            exit 1
-          }
+          Write-Host "[ERROR] Lite daemon failed to start after 60 seconds"
+          exit 1
 
       - name: Stop Reachy Mini Lite daemon
         if: always()
