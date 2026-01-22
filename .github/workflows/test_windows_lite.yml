@@ -21,9 +21,26 @@ jobs:
           python -m pip install --upgrade pip
           pip install reachy-mini
 
-      - name: Start daemon (foreground to see all output)
+      - name: Start daemon in background
         shell: powershell
         run: |
-          Write-Host "Starting Reachy Mini Lite daemon in foreground..."
+          Write-Host "Starting Reachy Mini Lite daemon..."
           .venv\Scripts\Activate.ps1
-          reachy-mini-daemon --robot-name reachy_mini_lite --serialport auto --localhost-only
+          Start-Process reachy-mini-daemon -ArgumentList "--robot-name", "reachy_mini_lite", "--serialport", "auto", "--localhost-only" -NoNewWindow
+
+      - name: Wait and check status
+        shell: powershell
+        run: |
+          Write-Host "Waiting 15 seconds for daemon to start..."
+          Start-Sleep -Seconds 15
+          Write-Host "Checking daemon status..."
+          $response = Invoke-RestMethod -Uri "http://localhost:8000/api/daemon/status" -Method Get
+          Write-Host "Daemon state: $($response.state)"
+
+      - name: Stop daemon
+        if: always()
+        shell: powershell
+        run: |
+          Write-Host "Stopping daemon..."
+          curl.exe -X POST "http://localhost:8000/api/daemon/stop?goto_sleep=true"
+          Write-Host "Daemon stopped"
