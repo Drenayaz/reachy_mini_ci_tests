@@ -26,16 +26,27 @@ jobs:
         run: |
           Write-Host "Starting Reachy Mini Lite daemon..."
           .venv\Scripts\Activate.ps1
-          Start-Process reachy-mini-daemon -ArgumentList "--robot-name", "reachy_mini_lite", "--serialport", "auto", "--localhost-only" -NoNewWindow
+          $process = Start-Process reachy-mini-daemon -ArgumentList "--robot-name", "reachy_mini_lite", "--serialport", "auto", "--localhost-only" -NoNewWindow -PassThru -RedirectStandardOutput "out.log" -RedirectStandardError "err.log"
+          Write-Host "Daemon PID: $($process.Id)"
+          Write-Host "Waiting 15 seconds..."
+          Start-Sleep -Seconds 15
 
-      - name: Wait and check status
+      - name: Wait and check logs
         shell: powershell
         run: |
           Write-Host "Waiting 15 seconds for daemon to start..."
           Start-Sleep -Seconds 15
-          Write-Host "Checking daemon status..."
-          $response = Invoke-RestMethod -Uri "http://localhost:8000/api/daemon/status" -Method Get
-          Write-Host "Daemon state: $($response.state)"
+          Write-Host "=== STDOUT ==="
+          if (Test-Path out.log) { Get-Content out.log } else { Write-Host "(empty)" }
+          Write-Host "=== STDERR ==="
+          if (Test-Path err.log) { Get-Content err.log } else { Write-Host "(empty)" }
+          Write-Host "=== Checking daemon status ==="
+          try {
+            $response = Invoke-RestMethod -Uri "http://localhost:8000/api/daemon/status" -Method Get
+            Write-Host "Daemon state: $($response.state)"
+          } catch {
+            Write-Host "Failed to connect: $($_.Exception.Message)"
+          }
 
       - name: Stop daemon
         if: always()
