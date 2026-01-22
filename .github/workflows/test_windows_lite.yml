@@ -21,37 +21,56 @@ jobs:
           python -m pip install --upgrade pip
           pip install reachy-mini
 
-      - name: Start daemon in background
+      - name: Start Reachy Mini Lite daemon
         shell: powershell
         run: |
           Write-Host "Starting Reachy Mini Lite daemon..."
           .venv\Scripts\Activate.ps1
-          $process = Start-Process reachy-mini-daemon -ArgumentList "--robot-name", "reachy_mini_lite", "--serialport", "auto", "--localhost-only" -NoNewWindow -PassThru -RedirectStandardOutput "out.log" -RedirectStandardError "err.log"
+          $process = Start-Process reachy-mini-daemon -ArgumentList "--robot-name", "reachy_mini_lite", "--serialport", "auto", "--localhost-only" -NoNewWindow -PassThru
+          $process.Id | Out-File -FilePath lite_daemon.pid
           Write-Host "Daemon PID: $($process.Id)"
-          Write-Host "Waiting 15 seconds..."
-          Start-Sleep -Seconds 15
+          Write-Host "Waiting 20 seconds for daemon to initialize..."
+          Start-Sleep -Seconds 20
 
-      - name: Wait and check logs
+      - name: Check daemon status
         shell: powershell
         run: |
-          Write-Host "Waiting 15 seconds for daemon to start..."
-          Start-Sleep -Seconds 15
-          Write-Host "=== STDOUT ==="
-          if (Test-Path out.log) { Get-Content out.log } else { Write-Host "(empty)" }
-          Write-Host "=== STDERR ==="
-          if (Test-Path err.log) { Get-Content err.log } else { Write-Host "(empty)" }
-          Write-Host "=== Checking daemon status ==="
-          try {
-            $response = Invoke-RestMethod -Uri "http://localhost:8000/api/daemon/status" -Method Get
-            Write-Host "Daemon state: $($response.state)"
-          } catch {
-            Write-Host "Failed to connect: $($_.Exception.Message)"
+          Write-Host "Checking daemon status..."
+          $response = Invoke-RestMethod -Uri "http://localhost:8000/api/daemon/status" -Method Get
+          Write-Host "Daemon state: $($response.state)"
+          if ($response.state -eq "running") {
+            Write-Host "[OK] Lite daemon is running!"
+          } else {
+            Write-Host "[ERROR] Daemon state is not 'running'"
+            exit 1
           }
 
-      - name: Stop daemon
+      - name: Stop Reachy Mini Lite daemon
         if: always()
         shell: powershell
         run: |
-          Write-Host "Stopping daemon..."
+          Write-Host "Stopping Lite daemon via API..."
           curl.exe -X POST "http://localhost:8000/api/daemon/stop?goto_sleep=true"
-          Write-Host "Daemon stopped"
+          if ($LASTEXITCODE -eq 0) {
+            Write-Host "API stop successful"
+          } else {
+            Write-Host "API stop failed, will force kill"
+          }
+          Start-Sleep -Seconds 3
+          if (Test-Path lite_daemon.pid) {
+            $pid = Get-Content lite_daemon.pid
+            Write-Host "Killing process PID: $pid"
+            Stop-Process -Id $pid -Force -ErrorAction SilentlyContinue
+            Remove-Item lite_daemon.pid
+            Write-Host "Process stopped and PID file removed"
+          } else {
+            Write-Host "No PID file found"
+          }
+
+      - name: Cleanup virtual environment
+        if: always()
+        shell: powershell
+        run: |
+          Write-Host "Cleaning up virtual environment..."
+          Remove-Item -Recurse -Force .venv -ErrorAction SilentlyContinue
+          Write-Host "Cleanup complete"
