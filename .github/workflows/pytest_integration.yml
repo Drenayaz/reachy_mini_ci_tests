@@ -136,7 +136,7 @@ jobs:
           python3 -m pip install --upgrade pip
           pip install reachy-mini[mujoco,dev]
 
-      - name: Run pytest standalone tests (Iteration 1)
+      - name: Run pytest standalone tests
         run: |
           source .venv/bin/activate
           pytest tests/test_import.py tests/test_analytical_kinematics.py -v
@@ -179,6 +179,11 @@ jobs:
             kill $(cat sim_daemon.pid) 2>/dev/null || echo "Daemon already stopped"
             rm sim_daemon.pid
           fi
+
+      - name: Run pytest daemon and app tests
+        run: |
+          source .venv/bin/activate
+          pytest tests/test_daemon.py tests/test_app.py -v
 
       - name: Cleanup virtual environment
         if: always()
