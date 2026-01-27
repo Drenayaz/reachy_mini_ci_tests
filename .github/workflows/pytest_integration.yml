@@ -75,7 +75,7 @@ jobs:
         run: |
           source .venv/bin/activate
           python3 -m pip install --upgrade pip
-          pip install reachy-mini
+          pip install reachy-mini[dev]
 
       - name: Start Reachy Mini Lite daemon
         run: |
@@ -104,6 +104,11 @@ jobs:
         run: |
           source .venv/bin/activate
           python3 test_reachy_mini_lite.py
+
+      - name: Run pytest video DEFAULT tests
+        run: |
+          source .venv/bin/activate
+          pytest tests/test_video.py -m "video and not video_gstreamer" -v
 
       - name: Stop Reachy Mini Lite daemon
         if: always()
