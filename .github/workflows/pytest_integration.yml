@@ -24,7 +24,7 @@ jobs:
         run: |
           source .venv/bin/activate
           python3 -m pip install --upgrade pip
-          pip install reachy-mini
+          pip install reachy-mini[dev]
 
       - name: Start Reachy Mini Wireless daemon
         run: |
@@ -50,6 +50,11 @@ jobs:
         run: |
           source .venv/bin/activate
           python3 test_reachy_mini_wireless.py
+
+      - name: Run pytest wireless DEFAULT tests
+        run: |
+          source .venv/bin/activate
+          pytest tests/test_wireless.py -m "wireless and not wireless_gstreamer" -v
 
       - name: Stop Reachy Mini Wireless daemon
         if: always()
