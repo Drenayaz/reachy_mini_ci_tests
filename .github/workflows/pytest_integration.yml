@@ -24,7 +24,7 @@ jobs:
         run: |
           source .venv/bin/activate
           python3 -m pip install --upgrade pip
-          pip install reachy-mini[dev]
+          pip install reachy-mini[gstreamer,dev]
 
       - name: Start Reachy Mini Wireless daemon
         run: |
@@ -56,6 +56,11 @@ jobs:
           source .venv/bin/activate
           pytest tests/test_wireless.py -m "wireless and not wireless_gstreamer" -v
 
+      - name: Run pytest wireless GStreamer tests
+        run: |
+          source .venv/bin/activate
+          pytest tests/test_wireless.py -m wireless_gstreamer -v
+
       - name: Stop Reachy Mini Wireless daemon
         if: always()
         run: |
@@ -80,7 +85,7 @@ jobs:
         run: |
           source .venv/bin/activate
           python3 -m pip install --upgrade pip
-          pip install reachy-mini[dev]
+          pip install reachy-mini[gstreamer,dev]
 
       - name: Start Reachy Mini Lite daemon
         run: |
@@ -119,6 +124,16 @@ jobs:
         run: |
           source .venv/bin/activate
           pytest tests/test_audio.py -m "audio and not audio_gstreamer" -k "not test_DoA" -v
+
+      - name: Run pytest video GStreamer tests
+        run: |
+          source .venv/bin/activate
+          pytest tests/test_video.py -m video_gstreamer -v
+
+      - name: Run pytest audio GStreamer tests
+        run: |
+          source .venv/bin/activate
+          pytest tests/test_audio.py -m audio_gstreamer -v
 
       - name: Stop Reachy Mini Lite daemon
         if: always()
