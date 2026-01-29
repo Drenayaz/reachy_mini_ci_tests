@@ -118,7 +118,7 @@ jobs:
       - name: Run pytest audio DEFAULT tests
         run: |
           source .venv/bin/activate
-          pytest tests/test_audio.py -m "audio and not audio_gstreamer" -k "not test_DoA" -v
+          pytest tests/test_audio.py -m "audio and not audio_gstreamer" -v
 
       - name: Stop Reachy Mini Lite daemon
         if: always()
