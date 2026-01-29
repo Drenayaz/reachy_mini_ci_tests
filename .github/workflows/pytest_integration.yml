@@ -56,6 +56,17 @@ jobs:
           source .venv/bin/activate
           pytest tests/test_wireless.py -m "wireless and not wireless_gstreamer" -v
 
+      - name: Debug GStreamer environment
+        run: |
+          source .venv/bin/activate
+          echo "=== Checking webrtcsrc plugin ==="
+          gst-inspect-1.0 webrtcsrc || echo "webrtcsrc not found"
+          echo "=== GStreamer environment variables ==="
+          env | grep -i gst || echo "No GST env vars"
+          echo "GST_PLUGIN_PATH: $GST_PLUGIN_PATH"
+          echo "=== All GStreamer plugins ==="
+          gst-inspect-1.0 --print-all | grep webrtc || echo "No webrtc plugins found"
+
       - name: Run pytest wireless GStreamer tests
         run: |
           source .venv/bin/activate
