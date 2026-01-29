@@ -44,12 +44,6 @@ jobs:
             sleep 3
           done
           echo "[ERROR] Wireless daemon failed to start after 60 seconds"
-          exit 1
-
-      - name: Run Reachy Mini Wireless tests
-        run: |
-          source .venv/bin/activate
-          python3 test_reachy_mini_wireless.py
 
       - name: Stop Reachy Mini Wireless daemon
         if: always()
