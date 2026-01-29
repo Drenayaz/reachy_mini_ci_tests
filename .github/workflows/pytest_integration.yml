@@ -98,6 +98,11 @@ jobs:
           python3 -m pip install --upgrade pip
           pip install reachy-mini[gstreamer,dev]
 
+      - name: Debug PipeWire status
+        run: |
+          systemctl --user status pipewire || echo "PipeWire not running in user session"
+          ps aux | grep pipewire || echo "No pipewire process found"
+
       - name: Start Reachy Mini Lite daemon
         run: |
           echo "Starting Reachy Mini Lite daemon..."
