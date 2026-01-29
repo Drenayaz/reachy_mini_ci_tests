@@ -1,4 +1,4 @@
-name: Reachy Mini Integration Test
+name: Reachy Mini MacOs test
 
 on:
   pull_request:
