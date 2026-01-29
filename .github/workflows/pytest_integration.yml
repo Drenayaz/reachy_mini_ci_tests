@@ -51,26 +51,10 @@ jobs:
           source .venv/bin/activate
           python3 test_reachy_mini_wireless.py
 
-      - name: Run pytest wireless DEFAULT tests
+      - name: Run pytest wireless tests
         run: |
           source .venv/bin/activate
-          pytest tests/test_wireless.py -m "wireless and not wireless_gstreamer" -v
-
-      - name: Debug GStreamer environment
-        run: |
-          source .venv/bin/activate
-          echo "=== Checking webrtcsrc plugin ==="
-          gst-inspect-1.0 webrtcsrc || echo "webrtcsrc not found"
-          echo "=== GStreamer environment variables ==="
-          env | grep -i gst || echo "No GST env vars"
-          echo "GST_PLUGIN_PATH: $GST_PLUGIN_PATH"
-          echo "=== All GStreamer plugins ==="
-          gst-inspect-1.0 --print-all | grep webrtc || echo "No webrtc plugins found"
-
-      - name: Run pytest wireless GStreamer tests
-        run: |
-          source .venv/bin/activate
-          pytest tests/test_wireless.py -m wireless_gstreamer -v
+          pytest tests/test_wireless.py -m wireless -v
 
       - name: Stop Reachy Mini Wireless daemon
         if: always()
@@ -97,11 +81,6 @@ jobs:
           source .venv/bin/activate
           python3 -m pip install --upgrade pip
           pip install reachy-mini[gstreamer,dev]
-
-      - name: Debug PipeWire status
-        run: |
-          systemctl --user status pipewire || echo "PipeWire not running in user session"
-          ps aux | grep pipewire || echo "No pipewire process found"
 
       - name: Start Reachy Mini Lite daemon
         run: |
@@ -141,16 +120,6 @@ jobs:
           source .venv/bin/activate
           pytest tests/test_audio.py -m "audio and not audio_gstreamer" -k "not test_DoA" -v
 
-      - name: Run pytest video GStreamer tests
-        run: |
-          source .venv/bin/activate
-          pytest tests/test_video.py -m video_gstreamer -v
-
-      - name: Run pytest audio GStreamer tests
-        run: |
-          source .venv/bin/activate
-          pytest tests/test_audio.py -m audio_gstreamer -v
-
       - name: Stop Reachy Mini Lite daemon
         if: always()
         run: |
@@ -161,6 +130,16 @@ jobs:
             kill $(cat lite_daemon.pid) 2>/dev/null || echo "Daemon already stopped"
             rm lite_daemon.pid
           fi
+
+      - name: Run pytest video GStreamer tests
+        run: |
+          source .venv/bin/activate
+          pytest tests/test_video.py -m video_gstreamer -v
+
+      - name: Run pytest audio GStreamer tests
+        run: |
+          source .venv/bin/activate
+          pytest tests/test_audio.py -m audio_gstreamer -v
 
       - name: Cleanup virtual environment
         if: always()
