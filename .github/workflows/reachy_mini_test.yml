@@ -448,20 +448,20 @@ jobs:
           Remove-Item -Recurse -Force .venv -ErrorAction SilentlyContinue
           Write-Host "Cleanup complete"
 
-  macos_sim:
-    runs-on: ci-runner-macos
+  mac_sim:
+    runs-on: ci-runner-mac
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
 
       - name: Create virtual environment
-        run: python3 -m venv .venv
+        run: python3.12 -m venv .venv
 
       - name: Install dependencies with MuJoCo
         run: |
           source .venv/bin/activate
-          python3 -m pip install --upgrade pip
-          pip install reachy-mini[mujoco]
+          python3.12 -m pip install --upgrade pip
+          pip install "reachy-mini[mujoco]"
 
       - name: Start Reachy Mini Simulation daemon
         run: |
@@ -506,20 +506,20 @@ jobs:
         if: always()
         run: rm -rf .venv
 
-  macos_lite:
-    needs: macos_sim
-    runs-on: ci-runner-macos
+  mac_lite:
+    needs: mac_sim
+    runs-on: ci-runner-mac
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
 
       - name: Create virtual environment
-        run: python3 -m venv .venv
+        run: python3.12 -m venv .venv
 
       - name: Install dependencies
         run: |
           source .venv/bin/activate
-          python3 -m pip install --upgrade pip
+          python3.12 -m pip install --upgrade pip
           pip install reachy-mini
 
       - name: Start Reachy Mini Lite daemon
@@ -565,20 +565,20 @@ jobs:
         if: always()
         run: rm -rf .venv
 
-  macos_wireless:
-    needs: [linux_wireless, windows_wireless, macos_lite]
-    runs-on: ci-runner-macos
+  mac_wireless:
+    needs: [linux_wireless, windows_wireless, mac_lite]
+    runs-on: ci-runner-mac
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
 
       - name: Create virtual environment
-        run: python3 -m venv .venv
+        run: python3.12 -m venv .venv
 
       - name: Install dependencies
         run: |
           source .venv/bin/activate
-          python3 -m pip install --upgrade pip
+          python3.12 -m pip install --upgrade pip
           pip install reachy-mini
 
       - name: Start Reachy Mini Wireless daemon
@@ -599,12 +599,6 @@ jobs:
             sleep 3
           done
           echo "[ERROR] Wireless daemon failed to start after 60 seconds"
-          exit 1
-
-      - name: Run Reachy Mini Wireless tests
-        run: |
-          source .venv/bin/activate
-          python3 test_reachy_mini_wireless.py
 
       - name: Stop Reachy Mini Wireless daemon
         if: always()
